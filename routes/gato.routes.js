@@ -5,7 +5,7 @@ import {
   registrarGato,actualizarGato,
   eliminarGato,buscarGatos,
   enviarGatosPorEmail,   // Importe el nuevo controlador
-} from "../controllers/gato.controllers.js";
+} from "../controllers/gato.controller.js";
 import { capturarInfoSolicitud } from "../middlewares/auditoria.js";
 
 
