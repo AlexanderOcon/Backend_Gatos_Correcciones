@@ -1,6 +1,6 @@
 import db from "../firebase.js";
 import supabase from "../supabase.js";
-import { enviarListadoGatos } from '../utils/emailjs.js'; // ajuste la ruta
+import { enviarListadoGatos } from '../util/emailjs.js'; // ajuste la ruta
 
 export const guardarAuditoria = async ({
   accion,
