@@ -1,6 +1,31 @@
 import db from "../firebase.js";
 import supabase from "../supabase.js";
+import { enviarListadoGatos } from '../utils/emailjs.js'; // ajuste la ruta
 
+export const guardarAuditoria = async ({
+  accion,
+  gatoId,
+  valoresAnteriores = null,
+  valoresNuevos = null,
+  req,
+}) => {
+  try {
+    await db.collection("auditoria_gatos").add({
+      accion,
+      gatoId: gatoId || null,
+      fecha: new Date().toISOString(),
+      ip: req.auditoria?.ip || "desconocida",
+      userAgent: req.auditoria?.userAgent || "desconocido",
+      metodo: req.auditoria?.metodo || req.method,
+      ruta: req.auditoria?.ruta || req.originalUrl,
+      valoresAnteriores,
+      valoresNuevos,
+    });
+  } catch (err) {
+    // No rompemos la operación principal si falla el log
+    console.error("Error al guardar auditoría:", err.message);
+  }
+};
 
 export const registrarGato = async (req, res) => {
   try {
@@ -27,7 +52,7 @@ export const registrarGato = async (req, res) => {
 
     const extension = imagen.originalname.split(".").pop().toLowerCase();
 
-const nombreArchivo = `gato-${Date.now()}-${Math.random()
+    const nombreArchivo = `gato-${Date.now()}-${Math.random()
       .toString(36)
       .substring(2)}.${extension}`;
 
@@ -64,6 +89,21 @@ const nombreArchivo = `gato-${Date.now()}-${Math.random()
       fecha: new Date().toISOString(),
     });
 
+    await guardarAuditoria({
+      accion: "crear",
+      gatoId: docRef.id,
+      valoresAnteriores: null,
+      valoresNuevos: {
+        nombre,
+        edad: Number(edad),
+        peso: Number(peso),
+        raza,
+        imagenUrl,
+      },
+      req,
+    });
+
+
     res.status(201).json({
       mensaje: `¡Gato registrado con éxito! ID: ${docRef.id} | Nombre: ${nombre} | Edad: ${edad} años | Peso: ${peso} kg | Raza: ${raza}`,
       id: docRef.id,
@@ -79,26 +119,6 @@ const nombreArchivo = `gato-${Date.now()}-${Math.random()
     });
   }
 };
-
-export const obtenerGatos = async (req, res) => {
-  try {
-    const snapshot = await db.collection("gatos").orderBy("fecha", "desc").get();
-
-    const gatos = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    res.status(200).json(gatos);
-  } catch (error) {
-    console.error("Error al obtener gatos:", error);
-    res.status(500).json({
-      mensaje: "Error al obtener los gatos.",
-      error: error.message,
-    });
-  }
-};
-
 export const actualizarGato = async (req, res) => {
   try {
     const { id } = req.params;
@@ -113,6 +133,8 @@ export const actualizarGato = async (req, res) => {
 
     const docRef = db.collection("gatos").doc(id);
     const doc = await docRef.get();
+
+    const datosAnteriores = doc.data();   
 
     if (!doc.exists) {
       return res.status(404).json({
@@ -163,7 +185,29 @@ export const actualizarGato = async (req, res) => {
       edad: Number(edad),
       peso: Number(peso),
       raza,
+      imagenUrl
+    });
+
+    const valoresNuevos = {
+      nombre,
+      edad: Number(edad),
+      peso: Number(peso),
+      raza,
       imagenUrl,
+    };
+
+    await guardarAuditoria({
+      accion: "actualizar",
+      gatoId: id,
+      valoresAnteriores: {
+        nombre: datosAnteriores.nombre,
+        edad: datosAnteriores.edad,
+        peso: datosAnteriores.peso,
+        raza: datosAnteriores.raza,
+        imagenUrl: datosAnteriores.imagenUrl,
+      },
+      valoresNuevos,
+      req,
     });
 
     res.status(200).json({
@@ -180,13 +224,14 @@ export const actualizarGato = async (req, res) => {
   }
 };
 
-
 export const eliminarGato = async (req, res) => {
   try {
     const { id } = req.params;
 
     const docRef = db.collection("gatos").doc(id);
     const doc = await docRef.get();
+
+    const datosAnteriores = doc.data();
 
     if (!doc.exists) {
       return res.status(404).json({
@@ -211,6 +256,20 @@ export const eliminarGato = async (req, res) => {
     // Eliminar el documento de Firestore
     await docRef.delete();
 
+    await guardarAuditoria({
+      accion: "eliminar",
+      gatoId: id,
+      valoresAnteriores: {
+        nombre: datosAnteriores.nombre,
+        edad: datosAnteriores.edad,
+        peso: datosAnteriores.peso,
+        raza: datosAnteriores.raza,
+        imagenUrl: datosAnteriores.imagenUrl,
+      },
+      valoresNuevos: null,
+      req,
+    });
+
     res.status(200).json({
       mensaje: `Gato eliminado con éxito. ID: ${id}`,
     });
@@ -218,6 +277,94 @@ export const eliminarGato = async (req, res) => {
     console.error("Error al eliminar gato:", error);
     res.status(500).json({
       mensaje: "Error al eliminar el gato.",
+      error: error.message,
+    });
+  }
+};
+
+export const obtenerGatos = async (req, res) => {
+  try {
+    const snapshot = await db.collection("gatos").orderBy("fecha", "desc").get();
+    const gatos = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    res.status(200).json(gatos);
+  } catch (error) {
+    console.error("Error al obtener los gatos:", error);
+    res.status(500).json({
+      mensaje: "Error al obtener los gatos.",
+      error: error.message,
+    });
+  }
+};
+export const buscarGatos = async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || q.trim() === "") {
+      return res.status(400).json({
+        mensaje: "Debes enviar un término de búsqueda (parámetro q).",
+      });
+    }
+
+    const termino = q.trim().toLowerCase();
+
+    const snapshot = await db.collection("gatos").orderBy("fecha", "desc").get();
+
+    const gatos = snapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+      .filter((gato) => {
+        // Buscamos en todos los campos excepto el id
+        const nombre = String(gato.nombre || "").toLowerCase();
+        const raza = String(gato.raza || "").toLowerCase();
+        const edad = String(gato.edad || "");
+        const peso = String(gato.peso || "");
+        const fecha = gato.fecha
+          ? new Date(gato.fecha).toLocaleDateString("es-ES").toLowerCase()
+          : "";
+
+        return (
+          nombre.includes(termino) ||
+          raza.includes(termino) ||
+          edad.includes(termino) ||
+          peso.includes(termino) ||
+          fecha.includes(termino)
+        );
+      });
+
+    res.status(200).json(gatos);
+  } catch (error) {
+    console.error("Error al buscar gatos:", error);
+    res.status(500).json({
+      mensaje: "Error al buscar los gatos.",
+      error: error.message,
+    });
+  }
+};
+
+export const enviarGatosPorEmail = async (req, res) => {
+  try {
+    const snapshot = await db.collection('gatos').orderBy('fecha', 'desc').get();
+    const gatos = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    await enviarListadoGatos(gatos);
+
+    res.status(200).json({
+      mensaje: `Se envió el listado de ${gatos.length} gato(s) por correo.`,
+      total: gatos.length,
+    });
+  } catch (error) {
+    console.error('Error al enviar gatos por email:', error);
+    res.status(500).json({
+      mensaje: 'Error al enviar el listado de gatos por correo.',
       error: error.message,
     });
   }

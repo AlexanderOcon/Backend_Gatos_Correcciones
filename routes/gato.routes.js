@@ -1,9 +1,19 @@
 import express from "express";
 import multer from "multer";
-import { registrarGato, obtenerGatos, actualizarGato, eliminarGato } from "../controllers/gato.controller.js";
+import {
+  obtenerGatos,
+  registrarGato,actualizarGato,
+  eliminarGato,buscarGatos,
+  enviarGatosPorEmail,   // Importe el nuevo controlador
+} from "../controllers/gato.controllers.js";
+import { capturarInfoSolicitud } from "../middlewares/auditoria.js";
+
 
 
 const router = express.Router();
+
+router.use(capturarInfoSolicitud); 
+router.get('/gatos/enviar-email', enviarGatosPorEmail);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -12,16 +22,18 @@ const upload = multer({
   },
 });
 
-router.post(
-  "/gato",
+router.post("/gato", 
+  upload.single("imagen"), 
+  registrarGato);
+
+router.put("/gato/:id", 
   upload.single("imagen"),
-  registrarGato
-);
-router.get("/gatos", obtenerGatos);
-
-
-router.put("/gato/:id", upload.single("imagen"), actualizarGato);
+  actualizarGato);
 
 router.delete("/gato/:id", eliminarGato);
+
+router.get("/gatos/buscar", buscarGatos);   // nueva ruta
+
+router.get("/gatos", obtenerGatos);
 
 export default router;
