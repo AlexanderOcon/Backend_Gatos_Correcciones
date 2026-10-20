@@ -2,6 +2,7 @@ import express from "express";
 import { obtenerEstadisticas } from "../controllers/estadisticas.controller.js";
 import { exportarEstadisticasExcel, exportarEstadisticasPDF} from "../controllers/exportacion.controller.js";
 import { capturarInfoSolicitud } from "../middlewares/auditoria.js";
+import { exportarGatosCSV } from "../controllers/export.controller.js";
 
 const router = express.Router();
 
@@ -15,5 +16,8 @@ router.get("/estadisticas/excel", exportarEstadisticasExcel);
 
 // Descarga el PDF
 router.get("/estadisticas/pdf", exportarEstadisticasPDF);
+
+// Descarga el CSV
+router.get("/estadisticas/csv", exportarGatosCSV);
 
 export default router;
