@@ -41,7 +41,7 @@ export const exportarGatosLista = async (req, res) => {
       lineas.join("\n");
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Content-Disposition", "inline; filename=\"gatos-lista.txt\"");
+    res.setHeader("Content-Disposition", "attachment; filename=\"gatos-lista.txt\"");
     res.send(contenido);
   } catch (error) {
     console.error("Error al exportar lista:", error);
@@ -66,7 +66,7 @@ export const exportarGatosJSON = async (req, res) => {
 
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     // "inline" hace que en el navegador se vea el texto (fácil de seleccionar todo y copiar)
-    res.setHeader("Content-Disposition", "inline; filename=\"gatos.json\"");
+    res.setHeader("Content-Disposition", "attachment; filename=\"gatos.json\"");
     res.send(jsonFormateado);
   } catch (error) {
     console.error("Error al exportar JSON:", error);
@@ -128,7 +128,7 @@ sql += `  edad INT,\n`;
     }
 
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Content-Disposition", "inline; filename=\"gatos-insert.sql\"");
+    res.setHeader("Content-Disposition", "attachment; filename=\"gatos-insert.sql\"");
     res.send(sql);
   } catch (error) {
     console.error("Error al exportar SQL:", error);
